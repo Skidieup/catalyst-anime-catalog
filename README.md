@@ -1,5 +1,5 @@
 # ⚡ Catalyst Elite v8.5
-A lightweight, high-performance anime discovery engine packed into a single HTML file. No frameworks, no node_modules, no bloat. For those wondering why it's v8.5, it just sounds 😎 cool.
+A lightweight, high-performance anime discovery engine packed into a single HTML file. No frameworks, no node_modules, no bloat. For those wondering why it's v8.5, it just sounds 😎 cool. https://skidieup.github.io/catalyst-anime-catalog/
 
 # 👨‍💻 The Tech
 Logic: Vanilla JS (ES6+)
