@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Catalyst Elite v8.5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000;
+            color: #fff;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            touch-action: pan-y;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Catalyst Core Textures */
+        .glass-sheet {
+            background: rgba(10, 10, 10, 0.75);
+            backdrop-filter: blur(32px) saturate(210%);
+            -webkit-backdrop-filter: blur(32px) saturate(210%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Anime Command Center Redesign */
+        .registry-glow {
+            box-shadow: 0 0 40px -10px rgba(16, 185, 129, 0.2);
+        }
+        
+        .result-card {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .result-card:active {
+            background: rgba(16, 185, 129, 0.05);
+            border-color: rgba(16, 185, 129, 0.4);
+            transform: scale(0.98);
+        }
+
+        /* Trending Deck - Neural Physics */
+        .deck-wrapper {
+            perspective: 1200px;
+            height: 340px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .trending-card {
+            position: absolute;
+            width: 240px;
+            height: 300px;
+            border-radius: 28px;
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s, filter 0.4s;
+            cursor: grab;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.9);
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+            transform-origin: center bottom;
+            background: #111;
+        }
+
+        /* Previewer Animation */
+        #previewer {
+            transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1);
+            transform: translateY(100%);
+        }
+        #previewer.active { transform: translateY(0); }
+
+        .tap-active:active { transform: scale(0.96); transition: 0.1s; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* Shadow Mode UI States */
+        .shadow-ui { color: #ef4444 !important; border-color: rgba(239, 68, 68, 0.3) !important; }
+        
+        @keyframes pulse-emerald {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .status-pulse { animation: pulse-emerald 2s infinite; }
+
+        /* Mobile Detector UI */
+        #desktop-blocker {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 10000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        /* Notification Toast */
+        #toast {
+            position: fixed;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+            z-index: 999;
+        }
+        #toast.active { transform: translateX(-50%) translateY(0); opacity: 1; }
+    </style>
+</head>
+<body class="flex flex-col bg-black">
+
+    <!-- Desktop Blocker Overlay -->
+    <div id="desktop-blocker">
+        <div class="size-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-8 border border-emerald-500/20">
+            <i data-lucide="smartphone" class="size-10 text-emerald-500"></i>
+        </div>
+        <h2 class="text-xs font-black uppercase tracking-[0.5em] text-emerald-500 mb-2 italic">Mobile Protocol Required</h2>
+        <p class="text-[10px] text-zinc-600 uppercase tracking-widest max-w-xs leading-relaxed mono">
+            Catalyst Elite is optimized for touch interface. Please access via mobile device or switch to responsive mobile view.
+        </p>
+        <div class="mt-12 text-[8px] font-bold text-zinc-800 uppercase tracking-[0.3em]">
+            Status: Connection_Blocked
+        </div>
+    </div>
+
+    <div id="toast" class="glass-sheet px-6 py-3 rounded-2xl border-emerald-500/30 flex items-center gap-3 shadow-2xl">
+        <div class="size-2 rounded-full bg-emerald-500 status-pulse"></div>
+        <span class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 italic">Link Captured</span>
+    </div>
+
+    <!-- Navbar -->
+    <header class="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-black/80 backdrop-blur-md z-[60]">
+        <div class="flex items-center gap-3">
+            <div class="size-8 bg-white rounded-lg flex items-center justify-center rotate-3 shadow-lg">
+                <i data-lucide="zap" class="size-5 text-black fill-black"></i>
+            </div>
+            <div>
+                <h1 class="text-[10px] font-black uppercase tracking-[0.4em] leading-none">Catalyst</h1>
+                <p class="text-[7px] font-bold text-zinc-600 uppercase tracking-widest mt-1">Elite v8.5</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="shadow-toggle" onclick="toggleShadowMode()" class="size-10 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 tap-active">
+                <i data-lucide="eye-off" class="size-4"></i>
+            </button>
+            <button onclick="toggleCommand(true)" class="size-10 rounded-full border border-white/10 flex items-center justify-center text-zinc-400">
+                <i data-lucide="search" class="size-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Scroll Feed -->
+    <main id="main-scroll" class="flex-1 overflow-y-auto no-scrollbar pb-32">
+        <section class="mt-8 px-6">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 italic">Neural Trending</h2>
+                <span class="text-[7px] font-black text-zinc-800 uppercase tracking-widest">Global Sync</span>
+            </div>
+            <div id="deck-root" class="deck-wrapper relative overflow-visible"></div>
+        </section>
+
+        <section class="mt-12 px-5 space-y-6">
+            <div class="flex items-center justify-between">
+                <h2 id="grid-label" class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Anime Registry</h2>
+                <span id="page-tag" class="text-[8px] font-black text-zinc-800 mono">NODE_01</span>
+            </div>
+            <div id="anime-grid" class="grid grid-cols-2 gap-4"></div>
+            <div id="sentinel" class="py-16 flex justify-center">
+                <div class="size-6 border-2 border-white/10 border-t-emerald-500 rounded-full animate-spin"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Navigation Dock -->
+    <nav class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[70]">
+        <div class="glass-sheet px-3 py-2 rounded-[2.5rem] flex items-center gap-2 shadow-2xl">
+            <button onclick="scrollToTop()" class="size-12 rounded-full bg-white text-black flex items-center justify-center tap-active">
+                <i data-lucide="layout-grid" class="size-5"></i>
+            </button>
+            <button onclick="toggleCommand(true)" class="size-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 tap-active">
+                <i data-lucide="search" class="size-5"></i>
+            </button>
+            <button onclick="getRandomAnime()" class="size-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 tap-active">
+                <i data-lucide="zap" class="size-5"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Catalyst Anime Command Center -->
+    <div id="command-center" class="fixed inset-0 z-[100] bg-black/60 backdrop-blur-2xl invisible opacity-0 transition-all duration-500 flex items-start justify-center pt-10 px-4">
+        <div class="w-full max-w-xl flex flex-col h-[88vh]">
+            
+            <!-- Interface Header -->
+            <div class="flex items-center justify-between mb-4 px-2">
+                <div class="flex items-center gap-2">
+                    <div class="size-1.5 rounded-full bg-emerald-500 status-pulse"></div>
+                    <span class="text-[9px] font-black text-emerald-500/80 uppercase tracking-[0.3em] mono italic">Global_Anime_Sync.v8</span>
+                </div>
+                <button onclick="toggleCommand(false)" class="text-[10px] font-black text-zinc-500 uppercase tracking-widest hover:text-white transition-colors">Abort</button>
+            </div>
+
+            <!-- Search Console -->
+            <div class="glass-sheet rounded-3xl p-1 flex items-center registry-glow mb-6 border-emerald-500/10">
+                <div class="size-14 flex items-center justify-center text-emerald-500">
+                    <i data-lucide="scan-search" class="size-6"></i>
+                </div>
+                <input id="cmd-input" type="text" placeholder="QUERY ANIME REGISTRY..." class="bg-transparent border-none outline-none flex-1 py-5 text-sm font-bold uppercase tracking-[0.1em] text-white placeholder:text-zinc-800 italic">
+                <div class="px-4 text-[8px] font-black text-zinc-700 mono hidden sm:block">ID: CAT_085</div>
+            </div>
+
+            <!-- Registry Content -->
+            <div class="flex-1 flex flex-col overflow-hidden">
+                <div class="flex items-center justify-between mb-4 px-2">
+                    <span id="results-count" class="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Registry Standby</span>
+                    <span class="text-[8px] font-black text-zinc-800 uppercase mono">Uplink: Stable</span>
+                </div>
+
+                <div id="cmd-results" class="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-24">
+                    <div class="flex flex-col items-center justify-center h-full opacity-20 grayscale">
+                        <i data-lucide="satellite-dish" class="size-16 mb-4"></i>
+                        <p class="text-[10px] font-black uppercase tracking-[0.4em]">Ready for Access</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- The Deep Dive Previewer -->
+    <div id="previewer" class="fixed inset-0 z-[200] bg-black flex flex-col overflow-hidden">
+        <div class="absolute top-0 left-0 right-0 h-24 z-[210] flex items-center justify-between px-6 pointer-events-none">
+            <button onclick="closePreview()" class="size-12 rounded-full glass-sheet flex items-center justify-center pointer-events-auto tap-active">
+                <i data-lucide="arrow-left" class="size-6"></i>
+            </button>
+            <button id="share-btn" onclick="shareAnime()" class="size-12 rounded-full glass-sheet flex items-center justify-center pointer-events-auto tap-active">
+                <i data-lucide="share-2" class="size-5 text-emerald-500"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto no-scrollbar">
+            <div class="relative h-[65vh] w-full">
+                <img id="p-hero" src="" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/600x900/111/white?text=No+Image'">
+                <div class="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 right-0 p-8 space-y-4">
+                    <div class="flex items-center gap-2">
+                        <span id="p-score" class="px-2 py-0.5 rounded bg-emerald-500 text-black text-[10px] font-black tracking-widest status-pulse">0.00</span>
+                        <span id="p-rating" class="px-2 py-0.5 rounded border border-white/20 text-white text-[10px] font-black tracking-widest uppercase">N/A</span>
+                    </div>
+                    <h1 id="p-title" class="text-4xl font-black italic uppercase tracking-tighter leading-[0.85] mb-4">TITLE</h1>
+                    <div id="p-genres" class="flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+
+            <div class="p-8 space-y-12">
+                <div class="space-y-4">
+                    <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 italic">Neural Captures</h3>
+                    <div id="p-gallery" class="flex gap-4 overflow-x-auto no-scrollbar snap-x"></div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="glass-sheet rounded-2xl p-4 text-center">
+                        <p class="text-[8px] font-black text-zinc-600 uppercase mb-1">Episodes</p>
+                        <p id="p-episodes" class="text-sm font-black mono text-zinc-300">??</p>
+                    </div>
+                    <div class="glass-sheet rounded-2xl p-4 text-center">
+                        <p class="text-[8px] font-black text-zinc-600 uppercase mb-1">Rank</p>
+                        <p id="p-rank" class="text-sm font-black mono text-zinc-300">#??</p>
+                    </div>
+                    <div class="glass-sheet rounded-2xl p-4 text-center">
+                        <p class="text-[8px] font-black text-zinc-600 uppercase mb-1">Season</p>
+                        <p id="p-season" class="text-sm font-black mono text-zinc-300">??</p>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600">Registry Summary</h3>
+                    <p id="p-synopsis" class="text-sm text-zinc-400 font-medium leading-relaxed"></p>
+                </div>
+
+                <div class="space-y-6">
+                    <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600">Cast Registry</h3>
+                    <div id="p-cast" class="flex gap-4 overflow-x-auto no-scrollbar pb-2"></div>
+                </div>
+
+                <div class="space-y-6 pb-24">
+                    <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600">Production Terminal</h3>
+                    <div id="p-staff" class="grid grid-cols-2 gap-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let isFetching = false;
+        let trendingAnimes = [];
+        let activeAnimeData = null;
+        let shadowMode = false;
+        let startX = 0;
+        let isSwiping = false;
+
+        function checkDevice() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 1024;
+            const blocker = document.getElementById('desktop-blocker');
+            if (!isMobile) {
+                blocker.style.display = 'flex';
+            } else {
+                blocker.style.display = 'none';
+            }
+        }
+
+        async function init() {
+            checkDevice();
+            window.addEventListener('resize', checkDevice);
+            await fetchTrending();
+            await fetchNextPage();
+            setupInfiniteScroll();
+            setupSwipe();
+            lucide.createIcons();
+        }
+
+        function handleImgError(img) {
+            img.onerror = null;
+            img.src = 'https://placehold.co/400x600/111/333?text=Asset+Not+Found';
+            img.parentElement.classList.add('opacity-50');
+        }
+
+        async function fetchTrending() {
+            try {
+                const resp = await fetch('https://api.jikan.moe/v4/seasons/now?limit=10');
+                const json = await resp.json();
+                trendingAnimes = json.data || [];
+                renderDeck();
+            } catch(e) { console.error("Trending Fetch Error:", e); }
+        }
+
+        function renderDeck() {
+            const root = document.getElementById('deck-root');
+            root.innerHTML = '';
+            if(!trendingAnimes || trendingAnimes.length === 0) {
+                root.innerHTML = '<div class="text-[8px] font-black text-zinc-800 uppercase tracking-widest">Awaiting Uplink...</div>';
+                return;
+            }
+
+            trendingAnimes.slice(0, 6).forEach((anime, i) => {
+                const card = document.createElement('div');
+                card.className = "trending-card";
+                card.style.zIndex = trendingAnimes.length - i;
+                
+                const offset = i * 14;
+                const scale = 1 - (i * 0.06);
+                const rotate = i * 2;
+                card.style.transform = `translateX(${offset}px) scale(${scale}) rotate(${rotate}deg)`;
+                card.style.opacity = 1 - (i * 0.15);
+                card.style.filter = `blur(${i * 1}px)`;
+
+                const imgUrl = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || 'https://placehold.co/400x600/111/333?text=No+Cover';
+
+                card.innerHTML = `
+                    <img src="${imgUrl}" class="w-full h-full object-cover" onload="this.parentElement.style.background='none'" onerror="handleImgError(this)">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+                    <div class="absolute bottom-5 left-5 right-5">
+                        <p class="text-[7px] font-black text-emerald-500 uppercase tracking-widest mb-1">Trending #${i+1}</p>
+                        <h3 class="text-[11px] font-black uppercase leading-tight line-clamp-1">${anime.title}</h3>
+                    </div>
+                `;
+                card.onclick = () => getDeepInfo(anime.mal_id);
+                root.appendChild(card);
+            });
+        }
+
+        async function fetchNextPage() {
+            if (isFetching) return;
+            isFetching = true;
+            try {
+                const url = shadowMode 
+                    ? `https://api.jikan.moe/v4/anime?rating=rx&page=${currentPage}&limit=20`
+                    : `https://api.jikan.moe/v4/top/anime?page=${currentPage}&limit=20`;
+                
+                const resp = await fetch(url);
+                const json = await resp.json();
+                const data = json.data;
+                if(data) renderGrid(data);
+                currentPage++;
+                document.getElementById('page-tag').innerText = `NODE_${currentPage < 10 ? '0'+currentPage : currentPage}`;
+            } catch(e) { console.error("Page Fetch Error:", e); }
+            isFetching = false;
+        }
+
+        function renderGrid(list) {
+            const grid = document.getElementById('anime-grid');
+            list.forEach(anime => {
+                const card = document.createElement('div');
+                card.className = "group relative aspect-[2/3] rounded-3xl overflow-hidden bg-zinc-900 border border-white/5 tap-active";
+                
+                const imgUrl = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url;
+                
+                card.innerHTML = `
+                    <img src="${imgUrl}" class="w-full h-full object-cover opacity-80" onerror="handleImgError(this)">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+                    <div class="absolute bottom-4 left-4 right-4">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-[7px] font-black ${shadowMode ? 'text-red-500' : 'text-emerald-500'} uppercase tracking-widest">${anime.score || '??'}</span>
+                            <span class="text-[7px] font-black text-white/40 uppercase tracking-widest">${anime.type || 'TV'}</span>
+                        </div>
+                        <h3 class="text-[11px] font-black uppercase tracking-tight leading-none line-clamp-2">${anime.title}</h3>
+                    </div>
+                `;
+                card.onclick = () => getDeepInfo(anime.mal_id);
+                grid.appendChild(card);
+            });
+        }
+
+        async function getDeepInfo(id) {
+            try {
+                const [fullResp, charResp, picResp] = await Promise.all([
+                    fetch(`https://api.jikan.moe/v4/anime/${id}/full`),
+                    fetch(`https://api.jikan.moe/v4/anime/${id}/characters`),
+                    fetch(`https://api.jikan.moe/v4/anime/${id}/pictures`)
+                ]);
+                const fullJson = await fullResp.json();
+                const charJson = await charResp.json();
+                const picJson = await picResp.json();
+                
+                const anime = fullJson.data;
+                const chars = charJson.data;
+                const pics = picJson.data;
+                
+                activeAnimeData = anime;
+
+                document.getElementById('p-hero').src = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url;
+                document.getElementById('p-title').innerText = anime.title;
+                document.getElementById('p-score').innerText = `SCORE ${anime.score || '0.00'}`;
+                document.getElementById('p-rating').innerText = anime.rating || 'N/A';
+                document.getElementById('p-episodes').innerText = anime.episodes || '??';
+                document.getElementById('p-rank').innerText = `#${anime.rank || 'N/A'}`;
+                document.getElementById('p-season').innerText = (anime.season || anime.status || 'UNKNOWN').toUpperCase();
+                document.getElementById('p-synopsis').innerText = anime.synopsis || 'No record available.';
+
+                const gal = document.getElementById('p-gallery');
+                gal.innerHTML = '';
+                if (pics) {
+                    pics.slice(0, 8).forEach(p => {
+                        const img = document.createElement('img');
+                        img.className = "h-40 rounded-xl snap-center border border-white/5 shadow-lg";
+                        img.src = p.jpg?.large_image_url || p.jpg?.image_url;
+                        img.onerror = () => img.style.display = 'none';
+                        gal.appendChild(img);
+                    });
+                }
+
+                const genCont = document.getElementById('p-genres');
+                genCont.innerHTML = '';
+                (anime.genres || []).forEach(g => {
+                    genCont.innerHTML += `<span class="px-2 py-1 rounded bg-white/5 border border-white/10 text-[8px] font-black text-zinc-500 uppercase tracking-widest">${g.name}</span>`;
+                });
+
+                const castCont = document.getElementById('p-cast');
+                castCont.innerHTML = '';
+                if (chars) {
+                    chars.slice(0, 10).forEach(c => {
+                        const va = c.voice_actors?.find(v => v.language === 'Japanese');
+                        const div = document.createElement('div');
+                        div.className = "min-w-[120px] space-y-3";
+                        div.innerHTML = `
+                            <div class="relative size-28 rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
+                                <img src="${c.character.images?.jpg?.image_url}" class="w-full h-full object-cover" onerror="handleImgError(this)">
+                                ${va ? `<img src="${va.person.images?.jpg?.image_url}" class="absolute bottom-1 right-1 size-10 rounded-lg border-2 border-black object-cover" onerror="handleImgError(this)">` : ''}
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black uppercase text-white line-clamp-1">${c.character.name}</p>
+                                <p class="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">${va ? va.person.name : '??'}</p>
+                            </div>
+                        `;
+                        castCont.appendChild(div);
+                    });
+                }
+
+                const staffCont = document.getElementById('p-staff');
+                staffCont.innerHTML = '';
+                (anime.studios || []).forEach(s => {
+                    staffCont.innerHTML += `<div class="glass-sheet p-3 rounded-xl flex items-center gap-3"><i data-lucide="layout" class="size-4 text-emerald-500"></i><div class="flex flex-col"><span class="text-[7px] font-black text-zinc-700 uppercase">Studio</span><span class="text-[10px] font-bold text-white uppercase line-clamp-1">${s.name}</span></div></div>`;
+                });
+
+                document.getElementById('previewer').classList.add('active');
+                lucide.createIcons();
+            } catch(e) { console.error("Deep Info Error:", e); }
+        }
+
+        function toggleCommand(show) {
+            const cc = document.getElementById('command-center');
+            const input = document.getElementById('cmd-input');
+            if(show) { 
+                cc.classList.remove('invisible', 'opacity-0'); 
+                setTimeout(() => input.focus(), 300);
+            } else { 
+                cc.classList.add('invisible', 'opacity-0'); 
+                input.value = '';
+                document.getElementById('cmd-results').innerHTML = `<div class="flex flex-col items-center justify-center h-full opacity-20 grayscale"><i data-lucide="satellite-dish" class="size-16 mb-4"></i><p class="text-[10px] font-black uppercase tracking-[0.4em]">Ready for Access</p></div>`;
+                document.getElementById('results-count').innerText = 'Registry Standby';
+                lucide.createIcons();
+            }
+        }
+
+        function setupSwipe() {
+            const deck = document.getElementById('deck-root');
+            deck.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; isSwiping = true; }, { passive: true });
+            deck.addEventListener('touchmove', (e) => {
+                if (!isSwiping) return;
+                const currentX = e.touches[0].clientX;
+                const diff = startX - currentX;
+                const topCard = deck.querySelector('.trending-card');
+                if (topCard) topCard.style.transform = `translateX(${-diff}px) rotate(${-diff/10}deg) scale(1.05)`;
+            }, { passive: true });
+            deck.addEventListener('touchend', (e) => {
+                isSwiping = false;
+                const diff = startX - e.changedTouches[0].clientX;
+                if (Math.abs(diff) > 70) { 
+                    if(trendingAnimes.length > 0) {
+                        trendingAnimes.push(trendingAnimes.shift()); 
+                        renderDeck(); 
+                    }
+                } else renderDeck();
+            });
+        }
+
+        let sTimeout;
+        document.getElementById('cmd-input').oninput = (e) => {
+            clearTimeout(sTimeout);
+            const query = e.target.value;
+            const results = document.getElementById('cmd-results');
+            const countLabel = document.getElementById('results-count');
+
+            if(query.length < 3) {
+                if(query.length === 0) {
+                    results.innerHTML = `<div class="flex flex-col items-center justify-center h-full opacity-20 grayscale"><i data-lucide="satellite-dish" class="size-16 mb-4"></i><p class="text-[10px] font-black uppercase tracking-[0.4em]">Ready for Access</p></div>`;
+                    countLabel.innerText = 'Registry Standby';
+                    lucide.createIcons();
+                }
+                return;
+            };
+
+            sTimeout = setTimeout(async () => {
+                countLabel.innerText = 'Syncing...';
+                results.innerHTML = `<div class="p-12 flex flex-col items-center justify-center gap-4"><div class="size-6 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div><p class="text-[9px] font-black uppercase tracking-[0.4em] text-emerald-500 mono italic">Deciphering Records</p></div>`;
+                
+                try {
+                    const resp = await fetch(`https://api.jikan.moe/v4/anime?q=${query}&limit=8`);
+                    const json = await resp.json();
+                    const data = json.data;
+                    
+                    if(!data || data.length === 0) {
+                        results.innerHTML = `<div class="p-12 text-center text-[9px] font-black uppercase text-zinc-700 tracking-[0.2em]">Null Results in Archive</div>`;
+                        countLabel.innerText = '0 Matches';
+                        return;
+                    }
+
+                    results.innerHTML = '';
+                    countLabel.innerText = `${data.length} Records Found`;
+                    
+                    data.forEach((anime, i) => {
+                        const row = document.createElement('button');
+                        row.className = "w-full glass-sheet p-3 rounded-3xl flex items-center gap-4 text-left result-card group";
+                        const imgSmall = anime.images?.jpg?.small_image_url || anime.images?.jpg?.image_url;
+                        row.innerHTML = `
+                            <div class="relative size-16 shrink-0 rounded-2xl overflow-hidden bg-zinc-900 border border-white/5">
+                                <img src="${imgSmall}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onerror="handleImgError(this)">
+                            </div>
+                            <div class="flex-1 overflow-hidden">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-[8px] font-black text-emerald-500 mono">[ID:${anime.mal_id}]</span>
+                                    <span class="text-[7px] font-black text-zinc-600 uppercase tracking-widest truncate">${anime.type || 'TV'} / ${anime.score || '??'}</span>
+                                </div>
+                                <h4 class="text-[11px] font-black uppercase text-white tracking-tighter truncate">${anime.title}</h4>
+                            </div>
+                            <div class="pr-2"><i data-lucide="arrow-right" class="size-4 text-zinc-800"></i></div>
+                        `;
+                        row.onclick = () => { toggleCommand(false); getDeepInfo(anime.mal_id); };
+                        results.appendChild(row);
+                    });
+                    lucide.createIcons();
+                } catch(e) {
+                    results.innerHTML = `<div class="p-12 text-center text-red-500 text-[9px] font-black mono uppercase">Registry Error_0x44</div>`;
+                }
+            }, 600);
+        }
+
+        async function shareAnime() {
+            if (!activeAnimeData) return;
+            const text = `Check out ${activeAnimeData.title} on Catalyst Elite!`;
+            const url = activeAnimeData.url || `https://myanimelist.net/anime/${activeAnimeData.mal_id}`;
+            
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title: activeAnimeData.title, text: text, url: url });
+                } else {
+                    throw new Error('Native share unavailable');
+                }
+            } catch (err) {
+                const dummy = document.createElement('input');
+                document.body.appendChild(dummy);
+                dummy.value = url;
+                dummy.select();
+                document.execCommand('copy');
+                document.body.removeChild(dummy);
+                
+                const toast = document.getElementById('toast');
+                toast.classList.add('active');
+                setTimeout(() => toast.classList.remove('active'), 2500);
+            }
+        }
+
+        function toggleShadowMode() {
+            shadowMode = !shadowMode;
+            const btn = document.getElementById('shadow-toggle');
+            const label = document.getElementById('grid-label');
+            btn.classList.toggle('shadow-ui', shadowMode);
+            btn.innerHTML = shadowMode ? '<i data-lucide="flame" class="size-4"></i>' : '<i data-lucide="eye-off" class="size-4"></i>';
+            label.innerText = shadowMode ? 'Shadow Registry' : 'Anime Registry';
+            label.className = `text-[10px] font-black uppercase tracking-[0.4em] ${shadowMode ? 'text-red-500' : 'text-zinc-500'} italic`;
+            currentPage = 1;
+            document.getElementById('anime-grid').innerHTML = '';
+            fetchNextPage();
+            lucide.createIcons();
+        }
+
+        function setupInfiniteScroll() {
+            const scrollArea = document.getElementById('main-scroll');
+            scrollArea.addEventListener('scroll', () => {
+                if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 300) fetchNextPage();
+            });
+        }
+
+        function closePreview() { document.getElementById('previewer').classList.remove('active'); activeAnimeData = null; }
+        function scrollToTop() { document.getElementById('main-scroll').scrollTo({top: 0, behavior: 'smooth'}); }
+        async function getRandomAnime() { const resp = await fetch('https://api.jikan.moe/v4/random/anime'); const json = await resp.json(); getDeepInfo(json.data.mal_id); }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
+
